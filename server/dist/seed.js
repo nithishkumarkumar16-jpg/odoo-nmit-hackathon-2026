@@ -10,7 +10,30 @@ const db_1 = require("./db");
 const loginId_1 = require("./utils/loginId");
 async function runSeed() {
     console.log('--- Starting Seed Script ---');
-    // 1. Run migrations
+    // 1. Run migrations (Clean up tables first for clean re-runnable seed)
+    console.log('Cleaning up existing database tables...');
+    await (0, db_1.exec)(`
+    DROP VIEW IF EXISTS employee_current_status CASCADE;
+    DROP TABLE IF EXISTS audit_logs CASCADE;
+    DROP TABLE IF EXISTS notifications CASCADE;
+    DROP TABLE IF EXISTS payslips CASCADE;
+    DROP TABLE IF EXISTS salary_components CASCADE;
+    DROP TABLE IF EXISTS salary_structures CASCADE;
+    DROP TABLE IF EXISTS leave_requests CASCADE;
+    DROP TABLE IF EXISTS leave_balances CASCADE;
+    DROP TABLE IF EXISTS leave_types CASCADE;
+    DROP TABLE IF EXISTS attendance CASCADE;
+    DROP TABLE IF EXISTS documents CASCADE;
+    DROP TABLE IF EXISTS employee_private_info CASCADE;
+    DROP TABLE IF EXISTS employee_resume CASCADE;
+    DROP TABLE IF EXISTS employee_profiles CASCADE;
+    DROP TABLE IF EXISTS refresh_tokens CASCADE;
+    DROP TABLE IF EXISTS email_verification_tokens CASCADE;
+    DROP TABLE IF EXISTS users CASCADE;
+    DROP TABLE IF EXISTS login_id_counters CASCADE;
+    DROP TABLE IF EXISTS departments CASCADE;
+    DROP TABLE IF EXISTS companies CASCADE;
+  `);
     const schemaSql = fs_1.default.readFileSync(path_1.default.join(__dirname, '../../db/01_schema.sql'), 'utf-8');
     await (0, db_1.exec)(schemaSql);
     const funcSql = fs_1.default.readFileSync(path_1.default.join(__dirname, '../../db/02_functions.sql'), 'utf-8');

@@ -33,10 +33,15 @@ async function getDb() {
         };
     }
     if (!pgliteInstance) {
-        if (!fs_1.default.existsSync(dbDataDir)) {
-            fs_1.default.mkdirSync(dbDataDir, { recursive: true });
+        if (process.env.NODE_ENV === 'test') {
+            pgliteInstance = new pglite_1.PGlite();
         }
-        pgliteInstance = new pglite_1.PGlite(dbDataDir);
+        else {
+            if (!fs_1.default.existsSync(dbDataDir)) {
+                fs_1.default.mkdirSync(dbDataDir, { recursive: true });
+            }
+            pgliteInstance = new pglite_1.PGlite(dbDataDir);
+        }
         await pgliteInstance.waitReady;
     }
     return {
