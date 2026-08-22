@@ -17,6 +17,12 @@ export const Attendance: React.FC = () => {
   const [adminData, setAdminData] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setCurrentTime(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   // Fetch employee own attendance
   const fetchEmployeeAttendance = async () => {
@@ -102,6 +108,29 @@ export const Attendance: React.FC = () => {
     return `${Number(hours).toFixed(2)} hrs`;
   };
 
+  const activeCheckIn = !isAdmin ? employeeData.records?.find((record: any) =>
+    record.check_in_time && !record.check_out_time &&
+    new Date(record.date).toISOString().split('T')[0] === new Date().toISOString().split('T')[0]
+  ) : null;
+  const elapsedMinutes = activeCheckIn
+    ? Math.max(0, Math.floor((currentTime - new Date(activeCheckIn.check_in_time).getTime()) / 60_000))
+    : 0;
+  const elapsedLabel = `${Math.floor(elapsedMinutes / 60)}h ${elapsedMinutes % 60}m`;
+  const progress = Math.min(100, (elapsedMinutes / 480) * 100);
+  const estimatedFinish = activeCheckIn
+    ? new Date(new Date(activeCheckIn.check_in_time).getTime() + 8 * 60 * 60 * 1000)
+    : null;
+  const weekStart = new Date();
+  weekStart.setHours(0, 0, 0, 0);
+  weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
+  const weeklyHours = !isAdmin
+    ? employeeData.records.reduce((total: number, record: any) => {
+        const recordDate = new Date(record.date);
+        return recordDate >= weekStart ? total + (Number(record.work_hours) || 0) : total;
+      }, 0)
+    : 0;
+  const weeklyProgress = Math.min(100, (weeklyHours / 40) * 100);
+
   return (
     <div className="space-y-6">
       
@@ -174,7 +203,7 @@ export const Attendance: React.FC = () => {
 
       {/* Employee View: Summary Cards */}
       {!isAdmin && employeeData.summary && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
           <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm flex items-center space-x-4">
             <div className="w-12 h-12 bg-green-50 text-green-600 rounded-xl flex items-center justify-center">
               <Calendar size={20} />
@@ -202,6 +231,46 @@ export const Attendance: React.FC = () => {
             <div>
               <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Working Hours</p>
               <p className="text-2xl font-black text-gray-900 mt-0.5">{employeeData.summary.totalWorkHours || 0} Hrs</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!isAdmin && (
+        <div className="rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-600 to-violet-600 p-5 text-white shadow-sm">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-indigo-100">Workday Focus Timer</p>
+              <p className="mt-1 text-2xl font-black">{activeCheckIn ? elapsedLabel : 'Not checked in'}</p>
+              <p className="mt-1 text-xs text-indigo-100">
+                {estimatedFinish
+                  ? `Estimated 8-hour finish: ${formatTime(estimatedFinish.toISOString())}`
+                  : 'Check in to track today’s working time automatically.'}
+              </p>
+            </div>
+            <div className="w-full sm:w-64">
+              <div className="mb-1.5 flex justify-between text-[11px] font-semibold text-indigo-100">
+                <span>Daily progress</span>
+                <span>{Math.round(progress)}%</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-white/25">
+                <div className="h-full rounded-full bg-white transition-all" style={{ width: `${progress}%` }} />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Weekly Hours Pulse</p>
+                <p className="text-2xl font-black text-gray-900 mt-0.5">{weeklyHours.toFixed(1)} <span className="text-sm text-gray-400">/ 40 hrs</span></p>
+              </div>
+              <div className="w-10 h-10 bg-violet-50 text-violet-600 rounded-xl flex items-center justify-center">
+                <Clock size={18} />
+              </div>
+            </div>
+            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-gray-100">
+              <div className="h-full rounded-full bg-violet-500 transition-all" style={{ width: `${weeklyProgress}%` }} />
             </div>
           </div>
         </div>

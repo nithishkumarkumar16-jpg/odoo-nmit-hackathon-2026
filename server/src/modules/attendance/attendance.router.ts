@@ -2,7 +2,7 @@ import { Router, Response } from 'express';
 import { query } from '../../db';
 import { authenticate, requireRole, AuthRequest } from '../../middleware/auth';
 import { notifyCompany } from '../../services/socket';
-
+//attence added
 const router = Router();
 
 // GET /api/attendance/status - Get logged-in user's attendance status today
