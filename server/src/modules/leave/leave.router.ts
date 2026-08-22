@@ -24,6 +24,11 @@ router.get('/types', authenticate, async (req: AuthRequest, res: Response) => {
 router.get('/balances', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.query.userId ? (req.query.userId as string) : req.user!.userId;
+    if (userId !== req.user!.userId && req.user!.role !== 'admin') {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    const userRes = await query('SELECT user_id FROM users WHERE user_id = $1 AND company_id = $2', [userId, req.user!.companyId]);
+    if (userRes.rows.length === 0) return res.status(404).json({ error: 'User not found' });
     const year = Number(req.query.year) || new Date().getFullYear();
 
     const balances = await query(
@@ -55,6 +60,8 @@ router.post(
       if (targetUserId !== currentUserId && role !== 'admin') {
         return res.status(403).json({ error: 'Cannot request leave for another user' });
       }
+      const targetUser = await query('SELECT user_id FROM users WHERE user_id = $1 AND company_id = $2', [targetUserId, req.user!.companyId]);
+      if (targetUser.rows.length === 0) return res.status(404).json({ error: 'User not found' });
 
       const { leaveTypeId, startDate, endDate, totalDays, remarks } = req.body;
       if (!leaveTypeId || !startDate || !endDate || !totalDays) {
@@ -65,7 +72,7 @@ router.post(
       if (daysNum <= 0) return res.status(400).json({ error: 'Total days must be positive' });
 
       // Fetch leave type info
-      const ltRes = await query('SELECT * FROM leave_types WHERE leave_type_id = $1', [leaveTypeId]);
+      const ltRes = await query('SELECT * FROM leave_types WHERE leave_type_id = $1 AND company_id = $2', [leaveTypeId, req.user!.companyId]);
       if (ltRes.rows.length === 0) return res.status(400).json({ error: 'Invalid leave type' });
       const leaveType = ltRes.rows[0];
 
@@ -203,11 +210,7 @@ router.put(
       }
 
       const reqRes = await query(
-        `SELECT lr.*, lt.name AS leave_type_name, p.first_name, p.last_name
-         FROM leave_requests lr
-         JOIN users u ON u.user_id = lr.user_id
-         JOIN leave_types lt ON lt.leave_type_id = lr.leave_type_id
-         LEFT JOIN employee_profiles p ON p.user_id = lr.user_id
+        `SELECT lr.* FROM leave_requests lr JOIN users u ON u.user_id = lr.user_id
          WHERE lr.leave_request_id = $1 AND u.company_id = $2`,
         [requestId, req.user!.companyId]
       );
@@ -306,6 +309,12 @@ router.put(
   async (req: AuthRequest, res: Response) => {
     try {
       const { userId, leaveTypeId, year, totalDays } = req.body;
+      const ownership = await query(
+        `SELECT u.user_id FROM users u JOIN leave_types lt ON lt.leave_type_id = $2
+         WHERE u.user_id = $1 AND u.company_id = $3 AND lt.company_id = $3`,
+        [userId, leaveTypeId, req.user!.companyId]
+      );
+      if (ownership.rows.length === 0) return res.status(400).json({ error: 'User or leave type is not in this company' });
 
       const updated = await query(
         `INSERT INTO leave_balances (user_id, leave_type_id, year, total_days, used_days)

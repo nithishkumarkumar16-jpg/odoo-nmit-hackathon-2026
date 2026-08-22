@@ -17,8 +17,9 @@ router.get('/structure/:userId', authenticate, async (req: AuthRequest, res: Res
     }
 
     const salRes = await query(
-      `SELECT * FROM salary_structures WHERE user_id = $1 ORDER BY effective_from DESC LIMIT 1`,
-      [userId]
+      `SELECT ss.* FROM salary_structures ss JOIN users u ON u.user_id = ss.user_id
+       WHERE ss.user_id = $1 AND u.company_id = $2 ORDER BY ss.effective_from DESC LIMIT 1`,
+      [userId, req.user!.companyId]
     );
 
     if (salRes.rows.length === 0) {
@@ -57,6 +58,8 @@ router.post('/structure', authenticate, requireRole(['admin']), async (req: Auth
 
     const wage = Number(monthWage);
     if (!wage || wage <= 0) return res.status(400).json({ error: 'Valid month wage is required' });
+    const targetUser = await query('SELECT user_id FROM users WHERE user_id = $1 AND company_id = $2', [userId, req.user!.companyId]);
+    if (targetUser.rows.length === 0) return res.status(404).json({ error: 'Employee not found' });
 
     const effectiveFrom = new Date().toISOString().split('T')[0];
 
