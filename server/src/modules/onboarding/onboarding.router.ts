@@ -109,13 +109,14 @@ const signInSchema = z.object({
 
 router.post('/signin', validate(signInSchema), async (req: AuthRequest, res: Response) => {
   try {
-    const { loginIdentifier, password } = req.body;
+    const loginIdentifier = req.body.loginIdentifier.trim();
+    const { password } = req.body;
 
     const userRes = await query(
       `SELECT u.user_id, u.company_id, u.login_id, u.email, u.password_hash, u.role, u.must_change_password, u.is_active, c.name as company_name
        FROM users u
        JOIN companies c ON c.company_id = u.company_id
-       WHERE u.login_id = $1 OR u.email = $1`,
+       WHERE LOWER(u.login_id) = LOWER($1) OR LOWER(u.email) = LOWER($1)`,
       [loginIdentifier]
     );
 

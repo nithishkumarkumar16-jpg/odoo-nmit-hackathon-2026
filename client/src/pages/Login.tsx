@@ -29,7 +29,7 @@ export const Login: React.FC = () => {
     setLoading(true);
     try {
       const res = await api.post('/auth/signin', {
-        loginIdentifier: signInId,
+        loginIdentifier: signInId.trim(),
         password: signInPassword,
       });
       login(res.data.user, res.data.tokens);
