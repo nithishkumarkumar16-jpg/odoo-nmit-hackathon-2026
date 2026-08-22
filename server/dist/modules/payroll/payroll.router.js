@@ -13,7 +13,8 @@ router.get('/structure/:userId', auth_1.authenticate, async (req, res) => {
         if (role !== 'admin' && currentUserId !== userId) {
             return res.status(403).json({ error: 'Forbidden' });
         }
-        const salRes = await (0, db_1.query)(`SELECT * FROM salary_structures WHERE user_id = $1 ORDER BY effective_from DESC LIMIT 1`, [userId]);
+        const salRes = await (0, db_1.query)(`SELECT ss.* FROM salary_structures ss JOIN users u ON u.user_id = ss.user_id
+       WHERE ss.user_id = $1 AND u.company_id = $2 ORDER BY ss.effective_from DESC LIMIT 1`, [userId, req.user.companyId]);
         if (salRes.rows.length === 0) {
             return res.json({ structure: null, components: [] });
         }
@@ -36,6 +37,9 @@ router.post('/structure', auth_1.authenticate, (0, auth_1.requireRole)(['admin']
         const wage = Number(monthWage);
         if (!wage || wage <= 0)
             return res.status(400).json({ error: 'Valid month wage is required' });
+        const targetUser = await (0, db_1.query)('SELECT user_id FROM users WHERE user_id = $1 AND company_id = $2', [userId, req.user.companyId]);
+        if (targetUser.rows.length === 0)
+            return res.status(404).json({ error: 'Employee not found' });
         const effectiveFrom = new Date().toISOString().split('T')[0];
         // Create salary structure row
         const structRes = await (0, db_1.query)(`INSERT INTO salary_structures
