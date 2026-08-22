@@ -71,8 +71,16 @@ router.post('/check-in', authenticate, async (req: AuthRequest, res: Response) =
     }
 
     // Broadcast WebSocket event to update directory dots in real time
+    const employeeRes = await query(
+      'SELECT first_name, last_name FROM employee_profiles WHERE user_id = $1',
+      [userId]
+    );
+    const employeeName = employeeRes.rows.length > 0
+      ? `${employeeRes.rows[0].first_name} ${employeeRes.rows[0].last_name}`
+      : 'An employee';
     notifyCompany(companyId, 'ATTENDANCE_CHANGED', {
       userId,
+      employeeName,
       status: 'present',
       checkInTime: attRecord.check_in_time,
     });
@@ -111,8 +119,16 @@ router.post('/check-out', authenticate, async (req: AuthRequest, res: Response) 
       [userId, today]
     );
 
+    const employeeRes = await query(
+      'SELECT first_name, last_name FROM employee_profiles WHERE user_id = $1',
+      [userId]
+    );
+    const employeeName = employeeRes.rows.length > 0
+      ? `${employeeRes.rows[0].first_name} ${employeeRes.rows[0].last_name}`
+      : 'An employee';
     notifyCompany(companyId, 'ATTENDANCE_CHANGED', {
       userId,
+      employeeName,
       status: 'present',
       checkOutTime: updated.rows[0].check_out_time,
     });

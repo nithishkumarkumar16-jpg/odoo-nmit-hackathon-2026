@@ -9,7 +9,9 @@ dotenv.config();
 let pgliteInstance: PGlite | null = null;
 let pgPoolInstance: pool.Pool | null = null;
 
-const dbDataDir = path.join(__dirname, '../../../db/storage');
+const dbDataDir = process.env.PGLITE_DATA_DIR
+  ? path.resolve(process.env.PGLITE_DATA_DIR)
+  : path.join(__dirname, '../../../db/pglite');
 
 export async function getDb() {
   if (process.env.DATABASE_URL) {

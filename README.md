@@ -9,7 +9,7 @@ Dayflow is a secure, multi-tenant Human Resource Management System (HRMS) built 
 ### System Prerequisites
 - **Node.js**: `v24.19.0` or higher
 - **npm**: `v11.17.0` or higher
-- **Database**: Runs out-of-the-box using `@electric-sql/pglite` (embedded WebAssembly PostgreSQL 16) with persistent disk storage under `./db/storage`. To swap for an external server, set `DATABASE_URL` in `.env`.
+- **Database**: Runs out-of-the-box using `@electric-sql/pglite` (embedded WebAssembly PostgreSQL 16) with persistent disk storage under `./db/pglite`. Set `PGLITE_DATA_DIR` to override the embedded database path, or set `DATABASE_URL` to use an external server.
 
 ### Installation Steps
 
