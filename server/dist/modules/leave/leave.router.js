@@ -23,6 +23,12 @@ router.get('/types', auth_1.authenticate, async (req, res) => {
 router.get('/balances', auth_1.authenticate, async (req, res) => {
     try {
         const userId = req.query.userId ? req.query.userId : req.user.userId;
+        if (userId !== req.user.userId && req.user.role !== 'admin') {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+        const userRes = await (0, db_1.query)('SELECT user_id FROM users WHERE user_id = $1 AND company_id = $2', [userId, req.user.companyId]);
+        if (userRes.rows.length === 0)
+            return res.status(404).json({ error: 'User not found' });
         const year = Number(req.query.year) || new Date().getFullYear();
         const balances = await (0, db_1.query)(`SELECT lb.balance_id, lb.user_id, lb.leave_type_id, lb.year, lb.total_days, lb.used_days, lb.remaining_days,
               lt.name as leave_type_name, lt.is_paid, lt.requires_attachment
@@ -44,6 +50,9 @@ router.post('/request', auth_1.authenticate, storage_1.upload.single('attachment
         if (targetUserId !== currentUserId && role !== 'admin') {
             return res.status(403).json({ error: 'Cannot request leave for another user' });
         }
+        const targetUser = await (0, db_1.query)('SELECT user_id FROM users WHERE user_id = $1 AND company_id = $2', [targetUserId, req.user.companyId]);
+        if (targetUser.rows.length === 0)
+            return res.status(404).json({ error: 'User not found' });
         const { leaveTypeId, startDate, endDate, totalDays, remarks } = req.body;
         if (!leaveTypeId || !startDate || !endDate || !totalDays) {
             return res.status(400).json({ error: 'Missing required leave request fields' });
@@ -52,7 +61,7 @@ router.post('/request', auth_1.authenticate, storage_1.upload.single('attachment
         if (daysNum <= 0)
             return res.status(400).json({ error: 'Total days must be positive' });
         // Fetch leave type info
-        const ltRes = await (0, db_1.query)('SELECT * FROM leave_types WHERE leave_type_id = $1', [leaveTypeId]);
+        const ltRes = await (0, db_1.query)('SELECT * FROM leave_types WHERE leave_type_id = $1 AND company_id = $2', [leaveTypeId, req.user.companyId]);
         if (ltRes.rows.length === 0)
             return res.status(400).json({ error: 'Invalid leave type' });
         const leaveType = ltRes.rows[0];
@@ -147,9 +156,8 @@ router.put('/admin/requests/:id/review', auth_1.authenticate, (0, auth_1.require
         if (!['approved', 'rejected'].includes(status)) {
             return res.status(400).json({ error: 'Status must be approved or rejected' });
         }
-        const reqRes = await (0, db_1.query)('SELECT * FROM leave_requests WHERE leave_request_id = $1', [
-            requestId,
-        ]);
+        const reqRes = await (0, db_1.query)(`SELECT lr.* FROM leave_requests lr JOIN users u ON u.user_id = lr.user_id
+         WHERE lr.leave_request_id = $1 AND u.company_id = $2`, [requestId, req.user.companyId]);
         if (reqRes.rows.length === 0)
             return res.status(404).json({ error: 'Leave request not found' });
         const request = reqRes.rows[0];
@@ -213,6 +221,10 @@ router.get('/admin/allocations', auth_1.authenticate, (0, auth_1.requireRole)(['
 router.put('/admin/allocations', auth_1.authenticate, (0, auth_1.requireRole)(['admin']), async (req, res) => {
     try {
         const { userId, leaveTypeId, year, totalDays } = req.body;
+        const ownership = await (0, db_1.query)(`SELECT u.user_id FROM users u JOIN leave_types lt ON lt.leave_type_id = $2
+         WHERE u.user_id = $1 AND u.company_id = $3 AND lt.company_id = $3`, [userId, leaveTypeId, req.user.companyId]);
+        if (ownership.rows.length === 0)
+            return res.status(400).json({ error: 'User or leave type is not in this company' });
         const updated = await (0, db_1.query)(`INSERT INTO leave_balances (user_id, leave_type_id, year, total_days, used_days)
          VALUES ($1, $2, $3, $4, 0)
          ON CONFLICT (user_id, leave_type_id, year)

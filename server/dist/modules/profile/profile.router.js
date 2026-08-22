@@ -77,6 +77,9 @@ router.put('/:userId/resume', auth_1.authenticate, async (req, res) => {
         if (currentUserId !== userId && role !== 'admin') {
             return res.status(403).json({ error: 'Cannot edit another employee resume' });
         }
+        const target = await (0, db_1.query)('SELECT user_id FROM users WHERE user_id = $1 AND company_id = $2', [userId, req.user.companyId]);
+        if (target.rows.length === 0)
+            return res.status(404).json({ error: 'Profile not found' });
         const { about, jobHighlights, skills, certifications, interests } = req.body;
         await (0, db_1.query)(`INSERT INTO employee_resume (user_id, about, job_highlights, skills, certifications, interests, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, NOW())
@@ -110,6 +113,9 @@ router.put('/:userId/private-info', auth_1.authenticate, async (req, res) => {
         if (currentUserId !== userId && role !== 'admin') {
             return res.status(403).json({ error: 'Cannot edit another employee private info' });
         }
+        const target = await (0, db_1.query)('SELECT user_id FROM users WHERE user_id = $1 AND company_id = $2', [userId, req.user.companyId]);
+        if (target.rows.length === 0)
+            return res.status(404).json({ error: 'Profile not found' });
         const { dateOfBirth, residingAddress, nationality, personalEmail, gender, maritalStatus, emergencyContactName, emergencyContactPhone, bankName, bankAccountNumber, bankIfsc, panNumber, aadharNumber, bloodGroup, } = req.body;
         // Encrypt sensitive national IDs & financial info at rest
         const bankEnc = bankAccountNumber ? (0, crypto_1.encryptPII)(bankAccountNumber) : undefined;

@@ -89,6 +89,8 @@ router.put('/:userId/resume', authenticate, async (req: AuthRequest, res: Respon
     if (currentUserId !== userId && role !== 'admin') {
       return res.status(403).json({ error: 'Cannot edit another employee resume' });
     }
+    const target = await query('SELECT user_id FROM users WHERE user_id = $1 AND company_id = $2', [userId, req.user!.companyId]);
+    if (target.rows.length === 0) return res.status(404).json({ error: 'Profile not found' });
 
     const { about, jobHighlights, skills, certifications, interests } = req.body;
 
@@ -129,6 +131,8 @@ router.put('/:userId/private-info', authenticate, async (req: AuthRequest, res: 
     if (currentUserId !== userId && role !== 'admin') {
       return res.status(403).json({ error: 'Cannot edit another employee private info' });
     }
+    const target = await query('SELECT user_id FROM users WHERE user_id = $1 AND company_id = $2', [userId, req.user!.companyId]);
+    if (target.rows.length === 0) return res.status(404).json({ error: 'Profile not found' });
 
     const {
       dateOfBirth,
