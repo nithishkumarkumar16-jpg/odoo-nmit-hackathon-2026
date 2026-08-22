@@ -24,6 +24,14 @@ export default {
       },
       fontFamily: {
         sans: ['Inter', 'sans-serif'],
+      },
+      letterSpacing: {
+        tighter: '-0.1em',
+        tight: '-0.075em',
+        normal: '-0.05em',
+        wide: '-0.025em',
+        wider: '0em',
+        widest: '0.05em',
       }
     },
   },

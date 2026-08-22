@@ -1,9 +1,23 @@
 -- ========== ENUM TYPES ==========
-CREATE TYPE user_role AS ENUM ('admin', 'employee');
-CREATE TYPE employment_status AS ENUM ('active', 'on_leave', 'terminated', 'resigned');
-CREATE TYPE leave_status AS ENUM ('pending', 'approved', 'rejected', 'cancelled');
-CREATE TYPE notification_type AS ENUM ('leave', 'attendance', 'payroll', 'system');
-CREATE TYPE computation_type AS ENUM ('fixed_amount', 'percentage_of_wage', 'percentage_of_basic');
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_role') THEN
+        CREATE TYPE user_role AS ENUM ('admin', 'employee');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'employment_status') THEN
+        CREATE TYPE employment_status AS ENUM ('active', 'on_leave', 'terminated', 'resigned');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'leave_status') THEN
+        CREATE TYPE leave_status AS ENUM ('pending', 'approved', 'rejected', 'cancelled');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'notification_type') THEN
+        CREATE TYPE notification_type AS ENUM ('leave', 'attendance', 'payroll', 'system');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'computation_type') THEN
+        CREATE TYPE computation_type AS ENUM ('fixed_amount', 'percentage_of_wage', 'percentage_of_basic');
+    END IF;
+END$$;
+
 
 -- ========== COMPANIES (multi-tenant root) ==========
 CREATE TABLE IF NOT EXISTS companies (

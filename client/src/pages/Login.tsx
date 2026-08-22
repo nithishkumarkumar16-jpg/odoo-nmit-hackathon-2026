@@ -39,7 +39,12 @@ export const Login: React.FC = () => {
         navigate('/');
       }
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Invalid credentials');
+      if (err.response?.data?.details) {
+        const detailsMsg = err.response.data.details.map((d: any) => d.message).join(', ');
+        setError(`Validation failed: ${detailsMsg}`);
+      } else {
+        setError(err.response?.data?.error || 'Invalid credentials');
+      }
     } finally {
       setLoading(false);
     }
@@ -65,7 +70,12 @@ export const Login: React.FC = () => {
       login(res.data.user, res.data.tokens);
       navigate('/');
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to onboard company');
+      if (err.response?.data?.details) {
+        const detailsMsg = err.response.data.details.map((d: any) => d.message).join(', ');
+        setError(`Validation failed: ${detailsMsg}`);
+      } else {
+        setError(err.response?.data?.error || 'Failed to onboard company');
+      }
     } finally {
       setLoading(false);
     }
