@@ -56,8 +56,13 @@ router.post('/check-in', auth_1.authenticate, async (req, res) => {
             attRecord = inserted.rows[0];
         }
         // Broadcast WebSocket event to update directory dots in real time
+        const employeeRes = await (0, db_1.query)('SELECT first_name, last_name FROM employee_profiles WHERE user_id = $1', [userId]);
+        const employeeName = employeeRes.rows.length > 0
+            ? `${employeeRes.rows[0].first_name} ${employeeRes.rows[0].last_name}`
+            : 'An employee';
         (0, socket_1.notifyCompany)(companyId, 'ATTENDANCE_CHANGED', {
             userId,
+            employeeName,
             status: 'present',
             checkInTime: attRecord.check_in_time,
         });
@@ -87,8 +92,13 @@ router.post('/check-out', auth_1.authenticate, async (req, res) => {
             return res.status(400).json({ error: 'Already checked out today' });
         }
         const updated = await (0, db_1.query)(`UPDATE attendance SET check_out_time = NOW() WHERE user_id = $1 AND date = $2 RETURNING *`, [userId, today]);
+        const employeeRes = await (0, db_1.query)('SELECT first_name, last_name FROM employee_profiles WHERE user_id = $1', [userId]);
+        const employeeName = employeeRes.rows.length > 0
+            ? `${employeeRes.rows[0].first_name} ${employeeRes.rows[0].last_name}`
+            : 'An employee';
         (0, socket_1.notifyCompany)(companyId, 'ATTENDANCE_CHANGED', {
             userId,
+            employeeName,
             status: 'present',
             checkOutTime: updated.rows[0].check_out_time,
         });

@@ -254,6 +254,9 @@ router.put(
       // Real-time notification push to employee via Socket.io!
       notifyUser(request.user_id, 'LEAVE_UPDATED', {
         requestId,
+        employeeName: request.first_name && request.last_name
+          ? `${request.first_name} ${request.last_name}`
+          : 'An employee',
         status,
         comments,
         leaveType: request.leave_type_name,
