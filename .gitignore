@@ -1,6 +1,7 @@
 # Runtime PGlite/PostgreSQL data is machine-local. Commit only schema and migration SQL.
 db/storage/
 db/storage-before-pull-*/
+db/pglite/
 uploads/
 
 # Build output and dependencies
@@ -8,3 +9,6 @@ server/dist/
 client/dist/
 server/node_modules/
 client/node_modules/
+
+# Local browser profile used for automated flow checks
+.browser-flow-test/

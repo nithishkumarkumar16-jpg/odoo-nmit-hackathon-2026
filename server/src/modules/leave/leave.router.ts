@@ -140,6 +140,11 @@ router.post(
 router.get('/heatmap', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const userId = (req.query.userId as string) || req.user!.userId;
+    if (userId !== req.user!.userId && req.user!.role !== 'admin') {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    const userRes = await query('SELECT user_id FROM users WHERE user_id = $1 AND company_id = $2', [userId, req.user!.companyId]);
+    if (userRes.rows.length === 0) return res.status(404).json({ error: 'User not found' });
     const year = Number(req.query.year) || new Date().getFullYear();
 
     const requests = await query(

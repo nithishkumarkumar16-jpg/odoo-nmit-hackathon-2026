@@ -22,21 +22,31 @@ export async function generateLoginId(
   lastName: string,
   joiningYear: number
 ): Promise<{ loginId: string; serialNo: number }> {
-  // Atomic counter update
-  const res = await query(
-    `INSERT INTO login_id_counters (company_id, joining_year, last_serial)
-     VALUES ($1, $2, 1)
-     ON CONFLICT (company_id, joining_year)
-     DO UPDATE SET last_serial = login_id_counters.last_serial + 1
-     RETURNING last_serial;`,
-    [companyId, joiningYear]
-  );
-
-  const serialNo = res.rows[0].last_serial;
   const companyPrefix = getCompanyPrefix(companyName);
   const initials = getNameInitials(firstName, lastName);
-  const serialStr = String(serialNo).padStart(4, '0');
 
-  const loginId = `${companyPrefix}${initials}${joiningYear}${serialStr}`;
-  return { loginId, serialNo };
+  // Login IDs are also accepted as a global sign-in identifier. Company prefixes
+  // are intentionally short, so two tenants can legitimately produce the same
+  // candidate (for example, "Flow Test" + "Flow Admin"). Keep allocating the
+  // company/year counter until the globally unique candidate is available.
+  for (let attempts = 0; attempts < 10000; attempts += 1) {
+    const res = await query(
+      `INSERT INTO login_id_counters (company_id, joining_year, last_serial)
+       VALUES ($1, $2, 1)
+       ON CONFLICT (company_id, joining_year)
+       DO UPDATE SET last_serial = login_id_counters.last_serial + 1
+       RETURNING last_serial;`,
+      [companyId, joiningYear]
+    );
+
+    const serialNo = Number(res.rows[0].last_serial);
+    const loginId = `${companyPrefix}${initials}${joiningYear}${String(serialNo).padStart(4, '0')}`;
+    const existing = await query('SELECT 1 FROM users WHERE login_id = $1 LIMIT 1', [loginId]);
+
+    if (existing.rows.length === 0) {
+      return { loginId, serialNo };
+    }
+  }
+
+  throw new Error('Unable to allocate a unique login ID');
 }

@@ -18,6 +18,9 @@ router.get('/:userId', authenticate, async (req: AuthRequest, res: Response) => 
 
     // Security check: only profile owner or admin can view
     const isOwner = currentUserId === userId;
+    if (!isOwner && role !== 'admin') {
+      return res.status(403).json({ error: 'Cannot view another employee profile' });
+    }
 
     const userRes = await query(
       `SELECT u.user_id, u.company_id, u.login_id, u.email, u.phone, u.role,
