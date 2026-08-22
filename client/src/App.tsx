@@ -9,6 +9,7 @@ import { Attendance } from './pages/Attendance';
 import { TimeOff } from './pages/TimeOff';
 import { Profile } from './pages/Profile';
 import { Payroll } from './pages/Payroll';
+import { Dashboard } from './pages/Dashboard';
 
 // Protected Route Guard
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -53,7 +54,8 @@ export const AppContent: React.FC = () => {
             </ProtectedRoute>
           }
         >
-          <Route index element={<Employees />} />
+          <Route index element={<Dashboard />} />
+          <Route path="employees" element={<Employees />} />
           <Route path="attendance" element={<Attendance />} />
           <Route path="time-off" element={<TimeOff />} />
           <Route path="payroll" element={<Payroll />} />
