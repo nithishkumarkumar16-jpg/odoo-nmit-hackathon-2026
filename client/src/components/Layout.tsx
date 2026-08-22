@@ -1,13 +1,85 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { NavLink, useNavigate, Outlet } from 'react-router-dom';
 import { LogOut, User as UserIcon, Play, Square, Bell, LogIn, ChevronDown } from 'lucide-react';
 
+interface NotificationItem {
+  id: string;
+  message: string;
+  type: 'attendance' | 'leave';
+  timestamp: string;
+  isRead: boolean;
+}
+
+const notificationStorageKey = (userId: string) => `dayflow_notifications_${userId}`;
+
+const formatNotificationDate = (value: string) =>
+  new Date(value).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
+
 export const Layout: React.FC = () => {
-  const { user, logout, attendanceStatus, checkIn, checkOut } = useAuth();
+  const { user, socket, logout, attendanceStatus, checkIn, checkOut } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!user) return;
+    const saved = localStorage.getItem(notificationStorageKey(user.userId));
+    if (!saved) {
+      setNotifications([]);
+      return;
+    }
+    try {
+      setNotifications(JSON.parse(saved));
+    } catch {
+      localStorage.removeItem(notificationStorageKey(user.userId));
+      setNotifications([]);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (!user || !socket) return;
+
+    const addNotification = (message: string, type: NotificationItem['type']) => {
+      setNotifications((current) => [{
+        id: `${Date.now()}-${Math.random()}`,
+        message,
+        type,
+        timestamp: new Date().toISOString(),
+        isRead: false,
+      }, ...current].slice(0, 50));
+    };
+    const formatTime = (value?: string) => value
+      ? new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+      : '';
+
+    const handleAttendance = (event: { employeeName?: string; checkInTime?: string; checkOutTime?: string }) => {
+      const action = event.checkOutTime ? 'checked out' : 'checked in';
+      const time = formatTime(event.checkOutTime || event.checkInTime);
+      addNotification(`${event.employeeName || 'An employee'} ${action}${time ? ` at ${time}` : ''}.`, 'attendance');
+    };
+    const handleNewLeave = (event: { employeeName?: string; leaveType?: string; startDate?: string; endDate?: string }) => {
+      addNotification(`${event.employeeName || 'An employee'} requested ${event.leaveType || 'leave'} from ${event.startDate || '?'} to ${event.endDate || '?'}.`, 'leave');
+    };
+    const handleLeaveUpdate = (event: { leaveType?: string; status?: string; comments?: string }) => {
+      addNotification(`Your ${event.leaveType || 'leave'} request was ${event.status || 'updated'}.${event.comments ? ` ${event.comments}` : ''}`, 'leave');
+    };
+
+    socket.on('ATTENDANCE_CHANGED', handleAttendance);
+    socket.on('NEW_LEAVE_REQUEST', handleNewLeave);
+    socket.on('LEAVE_UPDATED', handleLeaveUpdate);
+    return () => {
+      socket.off('ATTENDANCE_CHANGED', handleAttendance);
+      socket.off('NEW_LEAVE_REQUEST', handleNewLeave);
+      socket.off('LEAVE_UPDATED', handleLeaveUpdate);
+    };
+  }, [socket, user]);
+
+  useEffect(() => {
+    if (user) localStorage.setItem(notificationStorageKey(user.userId), JSON.stringify(notifications));
+  }, [notifications, user]);
 
   if (!user) return null;
 
@@ -98,6 +170,18 @@ export const Layout: React.FC = () => {
             >
               Time Off
             </NavLink>
+            <NavLink
+              to="/payroll"
+              className={({ isActive }) =>
+                `px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                  isActive
+                    ? 'bg-indigo-50 text-indigo-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                }`
+              }
+            >
+              Payroll
+            </NavLink>
           </nav>
 
           {/* Right Actions */}
@@ -143,6 +227,41 @@ export const Layout: React.FC = () => {
                 {error}
               </span>
             )}
+
+            {/* Real-time notification drawer */}
+            <div className="relative">
+              <button
+                aria-label="Notifications"
+                onClick={() => setNotificationsOpen(!notificationsOpen)}
+                className="relative w-9 h-9 rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50 flex items-center justify-center"
+              >
+                <Bell size={17} />
+                {notifications.some((notification) => !notification.isRead) && (
+                  <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-red-500 ring-2 ring-white animate-pulse" />
+                )}
+              </button>
+              {notificationsOpen && (
+                <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-xl border border-gray-200 z-50 overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                    <h3 className="text-sm font-bold text-gray-900">Notifications</h3>
+                    <div className="flex items-center gap-3 text-[11px] font-semibold">
+                      <button onClick={() => setNotifications((items) => items.map((item) => ({ ...item, isRead: true })))} className="text-indigo-600 hover:text-indigo-800">Mark all read</button>
+                      <button onClick={() => setNotifications([])} className="text-gray-500 hover:text-gray-800">Clear all</button>
+                    </div>
+                  </div>
+                  <div className="max-h-80 overflow-y-auto">
+                    {notifications.length === 0 ? (
+                      <p className="px-4 py-8 text-center text-sm text-gray-400">No notifications yet</p>
+                    ) : notifications.map((notification) => (
+                      <div key={notification.id} className={`px-4 py-3 border-b border-gray-50 ${notification.isRead ? 'bg-white' : 'bg-indigo-50/60'}`}>
+                        <p className="text-xs font-medium text-gray-800">{notification.message}</p>
+                        <p className="mt-1 text-[10px] text-gray-400">{formatNotificationDate(notification.timestamp)}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* User Dropdown */}
             <div className="relative">

@@ -5,7 +5,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
-const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const zod_1 = require("zod");
 const db_1 = require("../../db");
 const auth_1 = require("../../middleware/auth");
@@ -41,17 +40,15 @@ router.post('/signup', (0, validate_1.validate)(signUpSchema), async (req, res) 
         const nameParts = name.trim().split(/\s+/);
         const firstName = nameParts[0];
         const lastName = nameParts.slice(1).join(' ') || 'Admin';
-        const companyPrefix = (0, loginId_1.getCompanyPrefix)(companyName);
-        const initials = (0, loginId_1.getNameInitials)(firstName, lastName);
         const year = new Date().getFullYear();
-        const loginId = `${companyPrefix}${initials}${year}0001`;
+        const { loginId, serialNo } = await (0, loginId_1.generateLoginId)(company.company_id, companyName, firstName, lastName, year);
         const userRes = await (0, db_1.query)(`INSERT INTO users (company_id, login_id, email, phone, password_hash, role, must_change_password, is_email_verified)
        VALUES ($1, $2, $3, $4, $5, 'admin', FALSE, TRUE)
        RETURNING user_id, company_id, login_id, email, role, must_change_password`, [company.company_id, loginId, email, phone || null, passwordHash]);
         const adminUser = userRes.rows[0];
         // 3. Create Admin profile & resume & private info
         await (0, db_1.query)(`INSERT INTO employee_profiles (user_id, company_id, first_name, last_name, joining_serial_no, designation)
-       VALUES ($1, $2, $3, $4, 1, 'Administrator')`, [adminUser.user_id, company.company_id, firstName, lastName]);
+       VALUES ($1, $2, $3, $4, $5, 'Administrator')`, [adminUser.user_id, company.company_id, firstName, lastName, serialNo]);
         await (0, db_1.query)('INSERT INTO employee_resume (user_id) VALUES ($1)', [adminUser.user_id]);
         await (0, db_1.query)('INSERT INTO employee_private_info (user_id, personal_email) VALUES ($1, $2)', [adminUser.user_id, email]);
         // 4. Default Leave types for company
@@ -159,17 +156,11 @@ const changePasswordSchema = zod_1.z.object({
         newPassword: zod_1.z.string().min(6),
     }),
 });
-router.post('/change-password', (0, validate_1.validate)(changePasswordSchema), async (req, res) => {
+router.post('/change-password', auth_1.authenticate, (0, validate_1.validate)(changePasswordSchema), async (req, res) => {
     try {
-        const authHeader = req.headers.authorization;
-        if (!authHeader)
-            return res.status(401).json({ error: 'Unauthorized' });
         const { currentPassword, newPassword } = req.body;
-        const token = authHeader.split(' ')[1];
-        const payload = jsonwebtoken_1.default.decode(token);
-        if (!payload || !payload.userId)
-            return res.status(401).json({ error: 'Unauthorized' });
-        const userRes = await (0, db_1.query)('SELECT password_hash FROM users WHERE user_id = $1', [payload.userId]);
+        const userId = req.user.userId;
+        const userRes = await (0, db_1.query)('SELECT password_hash FROM users WHERE user_id = $1', [userId]);
         if (userRes.rows.length === 0)
             return res.status(404).json({ error: 'User not found' });
         const user = userRes.rows[0];
@@ -179,7 +170,7 @@ router.post('/change-password', (0, validate_1.validate)(changePasswordSchema), 
         const newHash = await bcryptjs_1.default.hash(newPassword, 12);
         await (0, db_1.query)('UPDATE users SET password_hash = $1, must_change_password = FALSE WHERE user_id = $2', [
             newHash,
-            payload.userId,
+            userId,
         ]);
         return res.json({ message: 'Password updated successfully' });
     }

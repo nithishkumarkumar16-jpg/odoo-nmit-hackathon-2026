@@ -1,11 +1,10 @@
 import { Router, Response } from 'express';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { query } from '../../db';
-import { AuthRequest, generateTokens, verifyRefreshToken } from '../../middleware/auth';
+import { authenticate, AuthRequest, generateTokens, verifyRefreshToken } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
-import { getNameInitials, getCompanyPrefix } from '../../utils/loginId';
+import { generateLoginId } from '../../utils/loginId';
 
 const router = Router();
 
@@ -46,10 +45,8 @@ router.post('/signup', validate(signUpSchema), async (req: AuthRequest, res: Res
     const firstName = nameParts[0];
     const lastName = nameParts.slice(1).join(' ') || 'Admin';
 
-    const companyPrefix = getCompanyPrefix(companyName);
-    const initials = getNameInitials(firstName, lastName);
     const year = new Date().getFullYear();
-    const loginId = `${companyPrefix}${initials}${year}0001`;
+    const { loginId, serialNo } = await generateLoginId(company.company_id, companyName, firstName, lastName, year);
 
     const userRes = await query(
       `INSERT INTO users (company_id, login_id, email, phone, password_hash, role, must_change_password, is_email_verified)
@@ -62,8 +59,8 @@ router.post('/signup', validate(signUpSchema), async (req: AuthRequest, res: Res
     // 3. Create Admin profile & resume & private info
     await query(
       `INSERT INTO employee_profiles (user_id, company_id, first_name, last_name, joining_serial_no, designation)
-       VALUES ($1, $2, $3, $4, 1, 'Administrator')`,
-      [adminUser.user_id, company.company_id, firstName, lastName]
+       VALUES ($1, $2, $3, $4, $5, 'Administrator')`,
+      [adminUser.user_id, company.company_id, firstName, lastName, serialNo]
     );
     await query('INSERT INTO employee_resume (user_id) VALUES ($1)', [adminUser.user_id]);
     await query('INSERT INTO employee_private_info (user_id, personal_email) VALUES ($1, $2)', [adminUser.user_id, email]);
@@ -195,17 +192,12 @@ const changePasswordSchema = z.object({
   }),
 });
 
-router.post('/change-password', validate(changePasswordSchema), async (req: AuthRequest, res: Response) => {
+router.post('/change-password', authenticate, validate(changePasswordSchema), async (req: AuthRequest, res: Response) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) return res.status(401).json({ error: 'Unauthorized' });
-
     const { currentPassword, newPassword } = req.body;
-    const token = authHeader.split(' ')[1];
-    const payload = jwt.decode(token) as any;
-    if (!payload || !payload.userId) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = req.user!.userId;
 
-    const userRes = await query('SELECT password_hash FROM users WHERE user_id = $1', [payload.userId]);
+    const userRes = await query('SELECT password_hash FROM users WHERE user_id = $1', [userId]);
     if (userRes.rows.length === 0) return res.status(404).json({ error: 'User not found' });
 
     const user = userRes.rows[0];
@@ -215,7 +207,7 @@ router.post('/change-password', validate(changePasswordSchema), async (req: Auth
     const newHash = await bcrypt.hash(newPassword, 12);
     await query('UPDATE users SET password_hash = $1, must_change_password = FALSE WHERE user_id = $2', [
       newHash,
-      payload.userId,
+      userId,
     ]);
 
     return res.json({ message: 'Password updated successfully' });
