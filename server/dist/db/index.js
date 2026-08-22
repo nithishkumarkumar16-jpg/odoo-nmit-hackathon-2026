@@ -14,7 +14,9 @@ const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
 let pgliteInstance = null;
 let pgPoolInstance = null;
-const dbDataDir = path_1.default.join(__dirname, '../../../db/storage');
+const dbDataDir = process.env.PGLITE_DATA_DIR
+    ? path_1.default.resolve(process.env.PGLITE_DATA_DIR)
+    : path_1.default.join(__dirname, '../../../db/pglite');
 async function getDb() {
     if (process.env.DATABASE_URL) {
         if (!pgPoolInstance) {

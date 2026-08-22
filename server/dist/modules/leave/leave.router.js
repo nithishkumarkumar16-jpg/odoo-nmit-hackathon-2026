@@ -79,9 +79,15 @@ router.post('/request', auth_1.authenticate, storage_1.upload.single('attachment
          VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
          RETURNING *`, [targetUserId, leaveTypeId, startDate, endDate, daysNum, remarks || null, attachmentUrl]);
         // Create notification for admins
+        const employeeRes = await (0, db_1.query)('SELECT first_name, last_name FROM employee_profiles WHERE user_id = $1', [targetUserId]);
+        const employeeName = employeeRes.rows.length > 0
+            ? `${employeeRes.rows[0].first_name} ${employeeRes.rows[0].last_name}`
+            : 'An employee';
         (0, socket_1.notifyCompany)(req.user.companyId, 'NEW_LEAVE_REQUEST', {
             requestId: reqRes.rows[0].leave_request_id,
             userId: targetUserId,
+            employeeName,
+            leaveType: leaveType.name,
             startDate,
             endDate,
         });
@@ -147,9 +153,12 @@ router.put('/admin/requests/:id/review', auth_1.authenticate, (0, auth_1.require
         if (!['approved', 'rejected'].includes(status)) {
             return res.status(400).json({ error: 'Status must be approved or rejected' });
         }
-        const reqRes = await (0, db_1.query)('SELECT * FROM leave_requests WHERE leave_request_id = $1', [
-            requestId,
-        ]);
+        const reqRes = await (0, db_1.query)(`SELECT lr.*, lt.name AS leave_type_name, p.first_name, p.last_name
+         FROM leave_requests lr
+         JOIN users u ON u.user_id = lr.user_id
+         JOIN leave_types lt ON lt.leave_type_id = lr.leave_type_id
+         LEFT JOIN employee_profiles p ON p.user_id = lr.user_id
+         WHERE lr.leave_request_id = $1 AND u.company_id = $2`, [requestId, req.user.companyId]);
         if (reqRes.rows.length === 0)
             return res.status(404).json({ error: 'Leave request not found' });
         const request = reqRes.rows[0];
@@ -178,8 +187,12 @@ router.put('/admin/requests/:id/review', auth_1.authenticate, (0, auth_1.require
         // Real-time notification push to employee via Socket.io!
         (0, socket_1.notifyUser)(request.user_id, 'LEAVE_UPDATED', {
             requestId,
+            employeeName: request.first_name && request.last_name
+                ? `${request.first_name} ${request.last_name}`
+                : 'An employee',
             status,
             comments,
+            leaveType: request.leave_type_name,
         });
         return res.json({
             message: `Leave request ${status}`,

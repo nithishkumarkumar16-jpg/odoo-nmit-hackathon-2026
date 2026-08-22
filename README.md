@@ -73,8 +73,22 @@ erDiagram
 
 ---
 
-## 3. Email & Notification Mode
-- **Active Mode**: **Dev Mode Console Fallback**. All notifications are intercepted and printed with full headers/body inside the backend server stdout console logs to allow verification without configuring SMTP transport credentials.
+## 3. Real-time Notifications
+
+- The notification bell in the top navigation shows unread activity and opens a notification drawer.
+- Attendance check-ins/check-outs and leave requests are broadcast to the company. Leave approvals and rejections are sent to the affected employee.
+- Notification messages include employee names and leave types where applicable.
+- Use **Mark all read** or **Clear all** in the drawer to manage messages. The latest 50 notifications are saved per user in browser `localStorage` and remain after a refresh.
+
+### PGlite storage
+
+By default, the embedded database is stored in `./db/pglite` (not `./db/storage`). To place it elsewhere, set `PGLITE_DATA_DIR` before starting the server:
+
+```bash
+PGLITE_DATA_DIR=./my-data npm run dev
+```
+
+Set `DATABASE_URL` instead when using an external PostgreSQL database.
 
 ---
 

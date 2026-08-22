@@ -264,18 +264,21 @@ export const TimeOff: React.FC = () => {
         </div>
 
         {/* Calendar Heatmap Grid */}
-        <div className="grid grid-cols-12 gap-4 bg-gray-50/50 p-6 rounded-2xl border border-gray-100">
+        <div className="grid grid-cols-2 gap-5 rounded-2xl border border-gray-100 bg-gray-50/50 p-4 sm:grid-cols-3 sm:p-5 lg:grid-cols-4 xl:grid-cols-6">
           {months.map((m, mIndex) => {
             const monthDays = days.filter((d) => d.month === mIndex);
             return (
-              <div key={m} className="space-y-2">
+              <div key={m} className="min-w-0 rounded-xl border border-gray-100 bg-white p-3 shadow-sm space-y-2.5">
                 <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider text-center">{m}</p>
-                <div className="grid grid-cols-7 gap-1">
+                <div className="grid grid-cols-7 gap-1.5 place-items-center">
+                  {Array.from({ length: monthDays[0]?.dayOfWeek ?? 0 }).map((_, index) => (
+                    <span key={`${m}-blank-${index}`} aria-hidden="true" className="h-4 w-4" />
+                  ))}
                   {monthDays.map((d) => (
                     <div
                       key={d.dateStr}
                       title={`${d.dateStr}: ${d.status || 'No leaves'}`}
-                      className={`w-3.5 h-3.5 rounded-sm flex items-center justify-center text-[8px] font-bold ${
+                      className={`h-4 w-4 rounded-md transition-colors ${
                         d.status === 'approved'
                           ? 'bg-green-500 text-white'
                           : d.status === 'pending'
