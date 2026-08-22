@@ -110,9 +110,18 @@ router.post(
       );
 
       // Create notification for admins
+      const employeeRes = await query(
+        'SELECT first_name, last_name FROM employee_profiles WHERE user_id = $1',
+        [targetUserId]
+      );
+      const employeeName = employeeRes.rows.length > 0
+        ? `${employeeRes.rows[0].first_name} ${employeeRes.rows[0].last_name}`
+        : 'An employee';
       notifyCompany(req.user!.companyId, 'NEW_LEAVE_REQUEST', {
         requestId: reqRes.rows[0].leave_request_id,
         userId: targetUserId,
+        employeeName,
+        leaveType: leaveType.name,
         startDate,
         endDate,
       });
@@ -247,6 +256,7 @@ router.put(
         requestId,
         status,
         comments,
+        leaveType: request.leave_type_name,
       });
 
       return res.json({
